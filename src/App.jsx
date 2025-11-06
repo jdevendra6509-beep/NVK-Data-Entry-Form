@@ -12,6 +12,7 @@ const COLORS = {
 
 const FONT = "'Quicksand', 'Nunito', 'Arial', sans-serif";
 
+// Your SheetDB endpoints
 const CENTERS_URL = "https://sheetdb.io/api/v1/shq898iize5yy";
 const ENTRIES_URL = "https://sheetdb.io/api/v1/a778ghwr05c6o";
 
@@ -24,7 +25,7 @@ function Card({ children }) {
       border: `3px solid ${COLORS.purple}`,
       marginBottom: "2.2rem",
       padding: "2.2rem 1.7rem",
-      minWidth: 320
+      minWidth: 320,
     }}>
       {children}
     </div>
@@ -40,7 +41,9 @@ function FormField({ label, value, onChange, id }) {
         color: COLORS.purple,
         marginBottom: 8,
         fontSize: "1.04rem",
-      }}>{label}</label>
+      }}>
+        {label}
+      </label>
       <input
         id={id}
         type="text"
@@ -63,298 +66,26 @@ function FormField({ label, value, onChange, id }) {
   );
 }
 
-function App() {
-  // Modes: menu, enter, view, edit
-  const [mode, setMode] = useState("menu");
-
-  // Shared state
-  const [centers, setCenters] = useState([]);
-  const [selectedCenter, setSelectedCenter] = useState("");
-
-  // Student data for "enter mode"
-  const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState("");
-  const [studentData, setStudentData] = useState({});
-  const [fields, setFields] = useState({
-    field1: "", field2: "", field3: "", field4: "", field5: ""
-  });
-
-  // For entries view/edit
-  const [entries, setEntries] = useState([]);
-  const [editingEntryId, setEditingEntryId] = useState(null);
-  const [editingFields, setEditingFields] = useState({
-    Field1: "", Field2: "", Field3: "", Field4: "", Field5: ""
-  });
-
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  // Load centers once
-  useEffect(() => {
-    fetch(CENTERS_URL)
-      .then(res => res.json())
-      .then(data => setCenters([...new Set(data.map(row => row["Center Name"]))]));
-  }, []);
-
-  // --- ENTER NEW DATA MODE LOGIC ---
-
-  // Load students when center selected in enter mode
-  useEffect(() => {
-    if (mode === "enter" && selectedCenter) {
-      fetch(CENTERS_URL)
-        .then(res => res.json())
-        .then(data => {
-          const filtered = data.filter(row => row["Center Name"] === selectedCenter);
-          setStudents(filtered.map(row => row["Student Name"]));
-        });
-    } else if (mode === "enter") {
-      setStudents([]);
-      setSelectedStudent("");
-    }
-  }, [selectedCenter, mode]);
-
-  // Load student data for selected student in enter mode
-  useEffect(() => {
-    if (mode === "enter" && selectedStudent && selectedCenter) {
-      fetch(CENTERS_URL)
-        .then(res => res.json())
-        .then(data => {
-          const studentRow = data.find(row =>
-            row["Center Name"] === selectedCenter &&
-            row["Student Name"] === selectedStudent
-          );
-          setStudentData(studentRow || {});
-        });
-    } else if (mode === "enter") {
-      setStudentData({});
-    }
-  }, [selectedStudent, selectedCenter, mode]);
-
-  // Submit new entry
-  const submitNewEntry = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const entry = {
-      Timestamp: new Date().toISOString(),
-      "Center Name": selectedCenter,
-      "Student Name": selectedStudent,
-      Field1: fields.field1,
-      Field2: fields.field2,
-      Field3: fields.field3,
-      Field4: fields.field4,
-      Field5: fields.field5,
-    };
-    try {
-      const res = await fetch(ENTRIES_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: [entry] }),
-      });
-      if (res.ok) {
-        setFields({ field1: "", field2: "", field3: "", field4: "", field5: "" });
-        setSelectedCenter("");
-        setSelectedStudent("");
-        setStudentData({});
-        setSubmitted(true);
-        setTimeout(() => setSubmitted(false), 2000);
-      } else {
-        alert("Could not submit to SheetDB.");
-      }
-    } catch {
-      alert("Network error—please check your internet/SheetDB setup.");
-    }
-    setSubmitting(false);
-  };
-
-  // --- VIEW DATA MODE LOGIC ---
-
-  // When center selected in view mode, load entries
-  useEffect(() => {
-    if (mode === "view" && selectedCenter) {
-      fetch(`${ENTRIES_URL}?Center Name=${encodeURIComponent(selectedCenter)}`)
-        .then(res => res.json())
-        .then(data => setEntries(data))
-        .catch(() => setEntries([]));
-    } else if (mode === "view") {
-      setEntries([]);
-    }
-  }, [selectedCenter, mode]);
-
-  // --- EDIT DATA MODE LOGIC ---
-
-  // When center selected in edit mode, load entries to edit
-  useEffect(() => {
-    if (mode === "edit" && selectedCenter) {
-      fetch(`${ENTRIES_URL}?Center Name=${encodeURIComponent(selectedCenter)}`)
-        .then(res => res.json())
-        .then(data => setEntries(data))
-        .catch(() => setEntries([]));
-    } else if (mode === "edit") {
-      setEntries([]);
-    }
-  }, [selectedCenter, mode]);
-
-  // Start editing an entry
-  const startEditEntry = (entry) => {
-    setEditingEntryId(entry.Timestamp); // Using Timestamp as unique id here (adjust if your data has clearer id)
-    setEditingFields({
-      Field1: entry.Field1 || "",
-      Field2: entry.Field2 || "",
-      Field3: entry.Field3 || "",
-      Field4: entry.Field4 || "",
-      Field5: entry.Field5 || ""
-    });
-  };
-
-  // Save edit: For SheetDB, limited API for PATCH; typically need to delete+re-add or full upload.
-  // For demo, let's simulate a POST with updated data (your real logic may vary)
-  const saveEditedEntry = async () => {
-    if (!editingEntryId) return;
-    setSubmitting(true);
-
-    try {
-      // Prepare updated entry
-      const updatedEntry = {
-        Timestamp: editingEntryId,
-        "Center Name": selectedCenter,
-        Field1: editingFields.Field1,
-        Field2: editingFields.Field2,
-        Field3: editingFields.Field3,
-        Field4: editingFields.Field4,
-        Field5: editingFields.Field5
-      };
-      // TODO: Replace with your actual update logic/API call
-      // Here just alert success for demonstration
-      alert("Save function is placeholder. Implement SheetDB update logic here.");
-      setEditingEntryId(null);
-      // Reload entries
-      const res = await fetch(`${ENTRIES_URL}?Center Name=${encodeURIComponent(selectedCenter)}`);
-      const data = await res.json();
-      setEntries(data);
-    } catch {
-      alert("Failed to save edits");
-    }
-    setSubmitting(false);
-  };
-
+function InfoBox({ center, student, agreementDate, birthDate }) {
   return (
-    <div style={{ minHeight: "100vh", fontFamily: FONT, padding: 24, maxWidth: 700, margin: "auto" }}>
-      {/* Main Menu */}
-      {mode === "menu" && (
-        <Card>
-          <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>Choose an action</h2>
-          <button onClick={() => { setMode("enter"); setSelectedCenter(""); setSelectedStudent(""); }} style={buttonStyle}>Enter New Data</button>
-          <button onClick={() => { setMode("view"); setSelectedCenter(""); }} style={buttonStyle}>View Data Entered</button>
-          <button onClick={() => { setMode("edit"); setSelectedCenter(""); }} style={buttonStyle}>Edit Entries</button>
-        </Card>
-      )}
-
-      {/* ENTER NEW DATA */}
-      {mode === "enter" && (
-        <>
-          <Card>
-            <button onClick={() => setMode("menu")} style={smallBackButton}>← Back to Menu</button>
-            <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>Step 1: Select Center</h2>
-            <select style={selectStyle} value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)}>
-              <option value="">--Select a center--</option>
-              {centers.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Card>
-
-          {selectedCenter && (
-            <Card>
-              <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>Step 2: Select Student</h2>
-              <select style={selectStyle} value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
-                <option value="">--Select a student--</option>
-                {students.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Card>
-          )}
-
-          {selectedStudent && (
-            <Card>
-              <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>Step 3: Enter Data</h2>
-              <form onSubmit={submitNewEntry}>
-                <FormField id="field1" label="Field 1" value={fields.field1} onChange={e => setFields(s => ({ ...s, field1: e.target.value }))} />
-                <FormField id="field2" label="Field 2" value={fields.field2} onChange={e => setFields(s => ({ ...s, field2: e.target.value }))} />
-                <FormField id="field3" label="Field 3" value={fields.field3} onChange={e => setFields(s => ({ ...s, field3: e.target.value }))} />
-                <FormField id="field4" label="Field 4" value={fields.field4} onChange={e => setFields(s => ({ ...s, field4: e.target.value }))} />
-                <FormField id="field5" label="Field 5" value={fields.field5} onChange={e => setFields(s => ({ ...s, field5: e.target.value }))} />
-                <button disabled={submitting} type="submit" style={buttonStyle}>Submit Entry</button>
-              </form>
-            </Card>
-          )}
-        </>
-      )}
-
-      {/* VIEW DATA */}
-      {mode === "view" && (
-        <Card>
-          <button onClick={() => setMode("menu")} style={smallBackButton}>← Back to Menu</button>
-          <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>View Data Entered</h2>
-          <select style={selectStyle} value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)}>
-            <option value="">--Select a center to view entries--</option>
-            {centers.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          {selectedCenter && (
-            <EntriesTable entries={entries} />
-          )}
-        </Card>
-      )}
-
-      {/* EDIT ENTRIES */}
-      {mode === "edit" && (
-        <>
-          <Card>
-            <button onClick={() => setMode("menu")} style={smallBackButton}>← Back to Menu</button>
-            <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>Edit Entries</h2>
-            <select style={selectStyle} value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)}>
-              <option value="">--Select a center to edit entries--</option>
-              {centers.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Card>
-
-          {selectedCenter && !editingEntryId && (
-            <EntriesTable
-              entries={entries}
-              onEditClick={startEditEntry} />
-          )}
-
-          {editingEntryId && (
-            <Card>
-              <h2 style={{ color: COLORS.purple, marginBottom: 16 }}>Editing Entry: {editingEntryId}</h2>
-              <FormField
-                id="edit-field1" label="Field 1"
-                value={editingFields.Field1}
-                onChange={e => setEditingFields(f => ({ ...f, Field1: e.target.value }))}
-              />
-              <FormField
-                id="edit-field2" label="Field 2"
-                value={editingFields.Field2}
-                onChange={e => setEditingFields(f => ({ ...f, Field2: e.target.value }))}
-              />
-              <FormField
-                id="edit-field3" label="Field 3"
-                value={editingFields.Field3}
-                onChange={e => setEditingFields(f => ({ ...f, Field3: e.target.value }))}
-              />
-              <FormField
-                id="edit-field4" label="Field 4"
-                value={editingFields.Field4}
-                onChange={e => setEditingFields(f => ({ ...f, Field4: e.target.value }))}
-              />
-              <FormField
-                id="edit-field5" label="Field 5"
-                value={editingFields.Field5}
-                onChange={e => setEditingFields(f => ({ ...f, Field5: e.target.value }))}
-              />
-              <button onClick={saveEditedEntry} disabled={submitting} style={buttonStyle}>Save Changes</button>
-              <button onClick={() => setEditingEntryId(null)} style={smallBackButton}>Cancel</button>
-            </Card>
-          )}
-        </>
-      )}
-
+    <div style={{
+      background: COLORS.infoBg,
+      borderRadius: "1em",
+      padding: "16px 18px",
+      marginBottom: 22,
+      color: COLORS.blue,
+      fontWeight: 600,
+      fontSize: "1.13rem",
+      border: `2px solid ${COLORS.blue}`,
+      boxShadow: "0 1px 9px rgba(25,145,235,0.05)",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px"
+    }}>
+      <div><strong>Center Name:</strong> {center}</div>
+      <div><strong>Student Name:</strong> {student}</div>
+      <div><strong>Agreement Date:</strong> {agreementDate}</div>
+      <div><strong>Birth Date:</strong> {birthDate}</div>
     </div>
   );
 }
@@ -398,7 +129,6 @@ const selectStyle = {
   fontWeight: 600
 };
 
-// Simple table to display entries
 function EntriesTable({ entries, onEditClick }) {
   if (!entries.length) return <p>No entries found for this center.</p>;
 
@@ -460,4 +190,270 @@ const tdStyle = {
   fontSize: "0.89rem"
 };
 
+function App() {
+  // Modes: menu, enter, view, edit
+  const [mode, setMode] = useState("menu");
+
+  const [centers, setCenters] = useState([]);
+  const [selectedCenter, setSelectedCenter] = useState("");
+
+  const [students, setStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState("");
+  const [studentData, setStudentData] = useState({});
+  const [fields, setFields] = useState({
+    field1: "", field2: "", field3: "", field4: "", field5: ""
+  });
+
+  const [entries, setEntries] = useState([]);
+  const [editingEntryId, setEditingEntryId] = useState(null);
+  const [editingFields, setEditingFields] = useState({
+    Field1: "", Field2: "", Field3: "", Field4: "", Field5: ""
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    fetch(CENTERS_URL)
+      .then(res => res.json())
+      .then(data => setCenters([...new Set(data.map(row => row["Center Name"]))]));
+  }, []);
+
+  // DATA ENTRY MODE EFFECTS
+  useEffect(() => {
+    if (mode === "enter" && selectedCenter) {
+      fetch(CENTERS_URL)
+        .then(res => res.json())
+        .then(data => {
+          const filtered = data.filter(row => row["Center Name"] === selectedCenter);
+          setStudents(filtered.map(row => row["Student Name"]));
+        });
+    } else if (mode === "enter") {
+      setStudents([]);
+      setSelectedStudent("");
+    }
+  }, [selectedCenter, mode]);
+
+  useEffect(() => {
+    if (mode === "enter" && selectedStudent && selectedCenter) {
+      fetch(CENTERS_URL)
+        .then(res => res.json())
+        .then(data => {
+          const studentRow = data.find(
+            row => row["Center Name"] === selectedCenter &&
+            row["Student Name"] === selectedStudent);
+          setStudentData(studentRow || {});
+        });
+    } else if (mode === "enter") {
+      setStudentData({});
+    }
+  }, [selectedStudent, selectedCenter, mode]);
+
+  // VIEW DATA MODE - fetch all and filter client-side
+  useEffect(() => {
+    if ((mode === "view" || mode === "edit") && selectedCenter) {
+      fetch(ENTRIES_URL)
+        .then(res => res.json())
+        .then(data => {
+          const filteredEntries = data.filter(entry => entry["Center Name"] === selectedCenter);
+          setEntries(filteredEntries);
+        })
+        .catch(() => setEntries([]));
+    } else if (mode === "view" || mode === "edit") {
+      setEntries([]);
+    }
+  }, [selectedCenter, mode]);
+
+  // Submit new entry
+  const submitNewEntry = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const entry = {
+      Timestamp: new Date().toISOString(),
+      "Center Name": selectedCenter,
+      "Student Name": selectedStudent,
+      Field1: fields.field1,
+      Field2: fields.field2,
+      Field3: fields.field3,
+      Field4: fields.field4,
+      Field5: fields.field5,
+    };
+    try {
+      const res = await fetch(ENTRIES_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: [entry] }),
+      });
+      if (res.ok) {
+        setFields({ field1: "", field2: "", field3: "", field4: "", field5: "" });
+        setSelectedCenter("");
+        setSelectedStudent("");
+        setStudentData({});
+        setSubmitted(true);
+        setTimeout(() => setSubmitted(false), 2000);
+      } else {
+        alert("Could not submit to SheetDB.");
+      }
+    } catch {
+      alert("Network error—please check your internet/SheetDB setup.");
+    }
+    setSubmitting(false);
+  };
+
+  // Begin editing entry
+  const startEditEntry = (entry) => {
+    setEditingEntryId(entry.Timestamp);
+    setEditingFields({
+      Field1: entry.Field1 || "",
+      Field2: entry.Field2 || "",
+      Field3: entry.Field3 || "",
+      Field4: entry.Field4 || "",
+      Field5: entry.Field5 || ""
+    });
+  };
+
+  // Save edited entry (Placeholder: needs your update logic)
+  const saveEditedEntry = async () => {
+    if (!editingEntryId) return;
+    setSubmitting(true);
+    try {
+      alert("Save feature placeholder - implement SheetDB update logic if available.");
+      setEditingEntryId(null);
+      // Refresh entries
+      const res = await fetch(ENTRIES_URL);
+      const data = await res.json();
+      const filtered = data.filter(entry => entry["Center Name"] === selectedCenter);
+      setEntries(filtered);
+    } catch {
+      alert("Failed to save edits");
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      fontFamily: FONT,
+      padding: 24,
+      maxWidth: 700,
+      margin: "auto",
+      background: `linear-gradient(130deg, ${COLORS.yellow} 0%, ${COLORS.pink} 100%)`
+    }}>
+      {/* Logo and header */}
+      <div style={{
+        textAlign: "center",
+        marginBottom: "2.4rem",
+        background: COLORS.white,
+        padding: 18,
+        borderBottom: `5px solid ${COLORS.purple}`,
+        borderRadius: "1rem"
+      }}>
+        <img src="/logo.png"
+          alt="App Logo"
+          style={{ width: 180, borderRadius: 13, boxShadow: "0 2px 16px rgba(0,0,0,0.1)", marginBottom: 12 }} />
+        <h1 style={{ color: COLORS.purple, fontWeight: 900, margin: 0 }}>Deva Data Entry App</h1>
+        <p style={{ color: COLORS.blue, fontWeight: 600, marginTop: 6, fontSize: "1.1rem" }}>Corporate Student Information Portal</p>
+      </div>
+
+      {mode === "menu" && (
+        <Card>
+          <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>Select an option</h2>
+          <button onClick={() => { setMode("enter"); setSelectedCenter(""); setSelectedStudent(""); }} style={buttonStyle}>Enter New Data</button>
+          <button onClick={() => { setMode("view"); setSelectedCenter(""); }} style={buttonStyle}>View Data Entered</button>
+          <button onClick={() => { setMode("edit"); setSelectedCenter(""); }} style={buttonStyle}>Edit Entries</button>
+        </Card>
+      )}
+
+      {/* ENTER NEW DATA MODE */}
+      {mode === "enter" && <>
+        <Card>
+          <button onClick={() => setMode("menu")} style={smallBackButton}>← Back to Menu</button>
+          <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>Step 1: Select Center</h2>
+          <select style={selectStyle} value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)}>
+            <option value="">--Select a center--</option>
+            {centers.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Card>
+
+        {selectedCenter && <Card>
+          <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>Step 2: Select Student</h2>
+          <select style={selectStyle} value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
+            <option value="">--Select a student--</option>
+            {students.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Card>}
+
+        {selectedStudent && <Card>
+          <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>Step 3: Enter Data</h2>
+          <form onSubmit={submitNewEntry}>
+            <FormField id="field1" label="Field 1" value={fields.field1} onChange={e => setFields(s => ({ ...s, field1: e.target.value }))} />
+            <FormField id="field2" label="Field 2" value={fields.field2} onChange={e => setFields(s => ({ ...s, field2: e.target.value }))} />
+            <FormField id="field3" label="Field 3" value={fields.field3} onChange={e => setFields(s => ({ ...s, field3: e.target.value }))} />
+            <FormField id="field4" label="Field 4" value={fields.field4} onChange={e => setFields(s => ({ ...s, field4: e.target.value }))} />
+            <FormField id="field5" label="Field 5" value={fields.field5} onChange={e => setFields(s => ({ ...s, field5: e.target.value }))} />
+            <button type="submit" disabled={submitting} style={buttonStyle}>Submit Entry</button>
+          </form>
+        </Card>}
+      </>}
+
+      {/* VIEW DATA MODE */}
+      {mode === "view" && <Card>
+        <button onClick={() => setMode("menu")} style={smallBackButton}>← Back to Menu</button>
+        <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>View Data Entered</h2>
+        <select style={selectStyle} value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)}>
+          <option value="">--Select a center to view entries--</option>
+          {centers.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {selectedCenter && <EntriesTable entries={entries} />}
+      </Card>}
+
+      {/* EDIT ENTRIES MODE */}
+      {mode === "edit" && <>
+        <Card>
+          <button onClick={() => setMode("menu")} style={smallBackButton}>← Back to Menu</button>
+          <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>Edit Entries</h2>
+          <select style={selectStyle} value={selectedCenter} onChange={e => setSelectedCenter(e.target.value)}>
+            <option value="">--Select a center to edit entries--</option>
+            {centers.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Card>
+
+        {selectedCenter && !editingEntryId && (
+          <Card>
+            <EntriesTable
+              entries={entries}
+              onEditClick={startEditEntry} />
+          </Card>
+        )}
+
+        {editingEntryId && (
+          <Card>
+            <h2 style={{ color: COLORS.purple, marginBottom: 20 }}>Editing Entry {editingEntryId}</h2>
+            <FormField id="edit-field1" label="Field 1" value={editingFields.Field1} onChange={e => setEditingFields(f => ({ ...f, Field1: e.target.value }))} />
+            <FormField id="edit-field2" label="Field 2" value={editingFields.Field2} onChange={e => setEditingFields(f => ({ ...f, Field2: e.target.value }))} />
+            <FormField id="edit-field3" label="Field 3" value={editingFields.Field3} onChange={e => setEditingFields(f => ({ ...f, Field3: e.target.value }))} />
+            <FormField id="edit-field4" label="Field 4" value={editingFields.Field4} onChange={e => setEditingFields(f => ({ ...f, Field4: e.target.value }))} />
+            <FormField id="edit-field5" label="Field 5" value={editingFields.Field5} onChange={e => setEditingFields(f => ({ ...f, Field5: e.target.value }))} />
+            <button onClick={saveEditedEntry} disabled={submitting} style={buttonStyle}>Save Changes</button>
+            <button onClick={() => setEditingEntryId(null)} style={smallBackButton}>Cancel</button>
+          </Card>
+        )}
+      </>}
+
+      {/* Submitted banner */}
+      {submitted && <div style={{
+        position: "fixed",
+        top: 20,
+        right: 20,
+        backgroundColor: COLORS.blue,
+        color: COLORS.white,
+        padding: "14px 22px",
+        borderRadius: 12,
+        boxShadow: "0 3px 15px rgba(0,0,0,0.25)",
+        fontWeight: "700",
+        fontSize: "1.1rem",
+        zIndex: 1000,
+      }}>✅ Entry Submitted!</div>}
+    </div>
+  );
+}
 export default App;
