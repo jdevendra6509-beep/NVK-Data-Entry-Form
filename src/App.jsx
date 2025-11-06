@@ -312,22 +312,58 @@ function App() {
   };
 
   // Save edited entry (Placeholder: needs your update logic)
-  const saveEditedEntry = async () => {
-    if (!editingEntryId) return;
-    setSubmitting(true);
-    try {
-      alert("Save feature placeholder - implement SheetDB update logic if available.");
-      setEditingEntryId(null);
-      // Refresh entries
-      const res = await fetch(ENTRIES_URL);
-      const data = await res.json();
-      const filtered = data.filter(entry => entry["Center Name"] === selectedCenter);
-      setEntries(filtered);
-    } catch {
-      alert("Failed to save edits");
+    const saveEditedEntry = async () => {
+  if (!editingEntryId) return;
+  setSubmitting(true);
+
+  try {
+    // 1. Delete old entry by Timestamp (unique identifier)
+    const deleteRes = await fetch(
+      `${ENTRIES_URL}/search?Timestamp=${encodeURIComponent(editingEntryId)}`,
+      { method: "DELETE" }
+    );
+    if (!deleteRes.ok) {
+      alert("Failed to delete existing entry.");
+      setSubmitting(false);
+      return;
     }
-    setSubmitting(false);
-  };
+
+    // 2. Add new updated entry with current data
+    const updatedEntry = {
+      Timestamp: editingEntryId, // Keep the same timestamp to identify the record
+      "Center Name": selectedCenter,
+      "Student Name": editingEntryStudentName || "", // You should track this
+      Field1: editingFields.Field1,
+      Field2: editingFields.Field2,
+      Field3: editingFields.Field3,
+      Field4: editingFields.Field4,
+      Field5: editingFields.Field5,
+    };
+
+    const addRes = await fetch(ENTRIES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [updatedEntry] }),
+    });
+    if (!addRes.ok) {
+      alert("Failed to add updated entry.");
+      setSubmitting(false);
+      return;
+    }
+
+    alert("Entry updated successfully!");
+    setEditingEntryId(null);
+
+    // Reload entries for selected center
+    const res = await fetch(ENTRIES_URL);
+    const allEntries = await res.json();
+    const filtered = allEntries.filter(e => e["Center Name"] === selectedCenter);
+    setEntries(filtered);
+  } catch (error) {
+    alert("Error updating entry: " + error.message);
+  }
+  setSubmitting(false);
+};
 
   return (
     <div style={{
